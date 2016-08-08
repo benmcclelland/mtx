@@ -1,0 +1,12 @@
+#!/bin/bash
+cat << EOD
+  Storage Changer /dev/sga:2 Drives, 6 Slots ( 2 Import/Export )
+Data Transfer Element 0:Full (Storage Element 1 Loaded):VolumeTag = M00001L6
+Data Transfer Element 1:Empty
+      Storage Element 1:Empty
+      Storage Element 2:Empty
+      Storage Element 3:Full :VolumeTag=M00003L6
+      Storage Element 4:Full :VolumeTag=CLN004L6
+      Storage Element 5 IMPORT/EXPORT:Full :VolumeTag=M00002L6
+      Storage Element 6 IMPORT/EXPORT:Empty
+EOD
