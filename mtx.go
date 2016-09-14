@@ -1,3 +1,8 @@
+/*
+Package mtx is a Go library for interacting with SCSI media changers.
+It wraps the mtx executable and parses the output.  The mtx executable
+is readily available in most distros.
+*/
 package mtx
 
 import (
@@ -38,28 +43,6 @@ var (
 	ieEmptyRxp  = regexp.MustCompile(`\s*Storage Element (\d*) IMPORT/EXPORT:Empty`)
 	ieFullRxp   = regexp.MustCompile(`\s*Storage Element (\d*) IMPORT/EXPORT:Full :VolumeTag=(.*)`)
 	clnRxp      = regexp.MustCompile(`(CLN.*)`)
-)
-
-var (
-	// ErrSummary happens when our regex could not match the mtx status summary line
-	ErrSummary = errors.New("unrecognized status summary string")
-	// ErrSlotNotFound happens when we can't find the home slot for media
-	ErrSlotNotFound = errors.New("unable to find requested slot for media")
-	// ErrVolNotInDrive happens when trying to unload a volume not in a drive
-	ErrVolNotInDrive = errors.New("media not in a drive")
-	// ErrNoDrives happens when trying to load a volume in an available drive and
-	// there are no empty drives
-	ErrNoDrives = errors.New("no empty drives")
-	// ErrInvalidDrive happens when we cant find the drive by ID
-	ErrInvalidDrive = errors.New("unable to find drive")
-	// ErrNoCLNMedia happens when we cant find any cleaning media in the library
-	ErrNoCLNMedia = errors.New("no cleaning media found")
-	// ErrNotInit happens when we try to access the Library MediaInfo before calling Status()
-	ErrNotInit = errors.New("media info not initialized, please call Status() on this Library first")
-	// ErrDrvNotAvail happens when trying to load media into a non-empty or unavaialble drive
-	ErrDrvNotAvail = errors.New("requested media load in non empty or avaialble drive")
-	// ErrNoHome happens when we can't figure out the home position for the volmue
-	ErrNoHome = errors.New("no home position found for volume")
 )
 
 // Volume is a representation for the media in the Library
@@ -156,7 +139,7 @@ func parseStatus(r io.Reader) (MediaInfo, error) {
 		line := lscanner.Text()
 		match := summaryRxp.FindStringSubmatch(line)
 		if len(match) != 4 {
-			return MediaInfo{}, ErrSummary
+			return MediaInfo{}, errors.Errorf("no summary output found")
 		}
 		driveCnt, err = strconv.Atoi(match[1])
 		if err != nil {
@@ -183,8 +166,8 @@ func parseStatus(r io.Reader) (MediaInfo, error) {
 	for lscanner.Scan() {
 		line := lscanner.Text()
 		// We are going to test these in the order of what we are
-		// more likely to hit a match on for a larger library
-		// to try to minimize the searching
+		// more likely to hit a match on to try to minimize the
+		// false matches in a large library
 		// Full storage slot
 		match := seFullRxp.FindStringSubmatch(line)
 		if match != nil {
@@ -287,24 +270,28 @@ func (l *Library) Inventory() error {
 	return errors.Wrap(err, "inventory")
 }
 
-// Load will attempt to move media from a storage slot to a drive
-func (l *Library) Load(slot, drive string) error {
+// Load will attempt to load volume into specified drive
+func (l *Library) Load(vol *Volume, drive Slot) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if l.mi.Drives[drive].Vol != nil {
-		return ErrDrvNotAvail
+	if l.mi.Drives[drive.ID].Vol != nil {
+		return errors.Errorf("attempting to load vol %v into non-epmty drive %v", vol.ID, drive.ID)
 	}
-	_, err := mtxCmd(l.Command, l.Device, "load", slot, drive)
+
+	if vol.Drive != "" {
+		return errors.Errorf("attempting to load vol %v that is already in drive %v", vol.ID, vol.Drive)
+	}
+	_, err := mtxCmd(l.Command, l.Device, "load", vol.Home, drive.ID)
 	if err == nil && l.initialized {
-		d := l.mi.Drives[drive]
-		l.mi.Drives[drive] = Slot{
+		d := l.mi.Drives[drive.ID]
+		l.mi.Drives[drive.ID] = Slot{
 			Type: d.Type,
 			ID:   d.ID,
-			Vol:  l.mi.Slots[slot].Vol,
+			Vol:  vol,
 		}
-		s := l.mi.Slots[slot]
-		l.mi.Slots[slot] = Slot{
+		s := l.mi.Slots[vol.Home]
+		l.mi.Slots[vol.Home] = Slot{
 			Type: s.Type,
 			ID:   s.ID,
 		}
@@ -312,51 +299,14 @@ func (l *Library) Load(slot, drive string) error {
 	return errors.Wrap(err, "load")
 }
 
-// LoadVol will attempt to move volume from home slot to an availble drive
-// The slot returned if no error will be the drive that it got loaded in
-func (l *Library) LoadVol(v Volume) (Slot, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if l.initialized == false {
-		return Slot{}, ErrNotInit
-	}
-	edrives := GetEmptyDrives(l.mi)
-	if len(edrives) == 0 {
-		return Slot{}, ErrNoDrives
-	}
-
-	var ok bool
-	if _, ok = l.mi.Drives[edrives[0]]; !ok {
-		return Slot{}, ErrInvalidDrive
-	}
-
-	_, err := mtxCmd(l.Command, l.Device, "load", v.Home, edrives[0])
-	if err == nil {
-		l.mi.Slots[v.Home].Vol.Drive = edrives[0]
-		d := l.mi.Drives[edrives[0]]
-		l.mi.Drives[edrives[0]] = Slot{
-			Type: d.Type,
-			ID:   d.ID,
-			Vol:  l.mi.Slots[v.Home].Vol,
-		}
-		s := l.mi.Slots[v.Home]
-		l.mi.Slots[v.Home] = Slot{
-			Type: s.Type,
-			ID:   s.ID,
-		}
-	}
-	return l.mi.Drives[edrives[0]], errors.Wrap(err, "loadvol")
-}
-
-// LoadCln will attempt to move randomized cleaning media to specified drive
+// LoadCln will attempt to move a randomized cleaning media to specified drive
 func (l *Library) LoadCln(d Slot) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	clns := FindCleaningMedia(l.mi)
 	if len(clns) == 0 {
-		return ErrNoCLNMedia
+		return errors.Errorf("no cleaning media avaiable")
 	}
 
 	// Pick random cleaning media to load balance them
@@ -379,50 +329,28 @@ func (l *Library) LoadCln(d Slot) error {
 	return errors.Wrap(err, "loadcln")
 }
 
-// Unload will attempt to move media from drive to a storage slot
-func (l *Library) Unload(slot, drive string) error {
+// Unload will attempt to move volume from drive to home slot
+func (l *Library) Unload(vol *Volume) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	_, err := mtxCmd(l.Command, l.Device, "unload", slot, drive)
+	if vol.Drive == "" {
+		return errors.Errorf("attmepting to unload volume %v not currently in drive", vol.ID)
+	}
+	if vol.Home == "" {
+		return errors.Errorf("no home slot found for volume %v, can't unlaod", vol.ID)
+	}
+
+	_, err := mtxCmd(l.Command, l.Device, "unload", vol.Home, vol.Drive)
 	if err == nil && l.initialized {
-		s := l.mi.Slots[slot]
-		l.mi.Slots[slot] = Slot{
+		s := l.mi.Slots[vol.Home]
+		l.mi.Slots[vol.Home] = Slot{
 			Type: s.Type,
 			ID:   s.ID,
-			Vol:  l.mi.Drives[drive].Vol,
+			Vol:  vol,
 		}
-		d := l.mi.Drives[drive]
-		l.mi.Drives[drive] = Slot{
-			Type: d.Type,
-			ID:   d.ID,
-		}
-	}
-	return errors.Wrap(err, "unload")
-}
-
-// UnloadVol will attempt to move volume from drive to home slot
-func (l *Library) UnloadVol(v Volume) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if v.Drive == "" {
-		return ErrVolNotInDrive
-	}
-	if v.Home == "" {
-		return ErrNoHome
-	}
-
-	_, err := mtxCmd(l.Command, l.Device, "unload", v.Home, v.Drive)
-	if err == nil && l.initialized {
-		s := l.mi.Slots[v.Home]
-		l.mi.Slots[v.Home] = Slot{
-			Type: s.Type,
-			ID:   s.ID,
-			Vol:  l.mi.Drives[v.Drive].Vol,
-		}
-		d := l.mi.Drives[v.Drive]
-		l.mi.Drives[v.Drive] = Slot{
+		d := l.mi.Drives[vol.Drive]
+		l.mi.Drives[vol.Drive] = Slot{
 			Type: d.Type,
 			ID:   d.ID,
 		}
@@ -430,36 +358,37 @@ func (l *Library) UnloadVol(v Volume) error {
 	return errors.Wrap(err, "unloadvol")
 }
 
-// Transfer will attempt to move media from one stroage slot to another
-func (l *Library) Transfer(slotA, slotB string) error {
+// Transfer will attempt to move volume to specified slot
+func (l *Library) Transfer(vol *Volume, slot Slot) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	_, err := mtxCmd(l.Command, l.Device, "transfer", slotA, slotB)
+	_, err := mtxCmd(l.Command, l.Device, "transfer", vol.ID, slot.ID)
 	if err == nil && l.initialized {
-		s := l.mi.Slots[slotB]
-		l.mi.Slots[slotB] = Slot{
+		s := l.mi.Slots[slot.ID]
+		l.mi.Slots[slot.ID] = Slot{
 			Type: s.Type,
 			ID:   s.ID,
-			Vol:  l.mi.Slots[slotA].Vol,
+			Vol:  vol,
 		}
-		s = l.mi.Slots[slotA]
-		l.mi.Slots[slotA] = Slot{
+		s = l.mi.Slots[vol.Home]
+		l.mi.Slots[vol.Home] = Slot{
 			Type: s.Type,
 			ID:   s.ID,
 		}
+		vol.Home = slot.ID
 	}
 	return errors.Wrap(err, "transfer")
 }
 
 // Info returns a copy of the MediaInfo for the library
 // Will be an empty struct if Status() hasn't been called yet
-func (l Library) Info() MediaInfo {
+func (l *Library) Info() MediaInfo {
 	return l.mi
 }
 
 // String representation for a Library is the device path
-func (l Library) String() string {
+func (l *Library) String() string {
 	return l.Device
 }
 
@@ -468,7 +397,7 @@ func GetDriveByID(id string, m MediaInfo) (Slot, error) {
 	if s, ok := m.Drives[id]; ok {
 		return s, nil
 	}
-	return Slot{}, ErrSlotNotFound
+	return Slot{}, errors.Errorf("no slot found for id %v", id)
 }
 
 // GetSlotByID returns the storage Slot for a given string ID
@@ -476,7 +405,7 @@ func GetSlotByID(id string, m MediaInfo) (Slot, error) {
 	if s, ok := m.Slots[id]; ok {
 		return s, nil
 	}
-	return Slot{}, ErrSlotNotFound
+	return Slot{}, errors.Errorf("no slot found for id %v", id)
 }
 
 // GetMboxByID returns the mailbox Slot for a given string ID
@@ -484,7 +413,7 @@ func GetMboxByID(id string, m MediaInfo) (Slot, error) {
 	if s, ok := m.Mboxes[id]; ok {
 		return s, nil
 	}
-	return Slot{}, ErrSlotNotFound
+	return Slot{}, errors.Errorf("no slot found for id %v", id)
 }
 
 // GetEmptyDrives returns a slice of string drive IDs with no volumes set
@@ -513,19 +442,14 @@ func FindCleaningMedia(m MediaInfo) []Volume {
 }
 
 // FindHomeSlot returns the home slot for the volume
-func FindHomeSlot(v Volume, m MediaInfo) (Slot, error) {
-	if s, ok := m.Slots[v.Home]; ok {
+func FindHomeSlot(vol Volume, mi MediaInfo) (Slot, error) {
+	if s, ok := mi.Slots[vol.Home]; ok {
 		return s, nil
 	}
-	if s, ok := m.Mboxes[v.Home]; ok {
+	if s, ok := mi.Mboxes[vol.Home]; ok {
 		return s, nil
 	}
-	return Slot{}, ErrSlotNotFound
-}
-
-// FindHomeID returns the string ID for the home slot for the volume
-func FindHomeID(v Volume) string {
-	return v.Home
+	return Slot{}, errors.Errorf("no home slot found for volume %v", vol.ID)
 }
 
 func mtxCmd(mtxcmd, dev string, args ...string) ([]byte, error) {
@@ -534,25 +458,25 @@ func mtxCmd(mtxcmd, dev string, args ...string) ([]byte, error) {
 	stdout, err := cmd.StdoutPipe()
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		err = errors.Wrap(err, "mtx command")
+		err = errors.Wrap(err, "mtx command setup stderr pipe")
 		return []byte{}, err
 	}
 	if err := cmd.Start(); err != nil {
-		err = errors.Wrap(err, "mtx command")
+		err = errors.Wrap(err, "mtx start command")
 		return []byte{}, err
 	}
 	cmdout, err := ioutil.ReadAll(stdout)
 	if err != nil {
-		err = errors.Wrap(err, "mtx command")
+		err = errors.Wrap(err, "mtx read stdout output")
 		return []byte{}, err
 	}
 	cmderr, err := ioutil.ReadAll(stderr)
 	if err != nil {
-		err = errors.Wrap(err, "mtx command")
+		err = errors.Wrap(err, "mtx read stderr output")
 		return []byte{}, err
 	}
 	if err := cmd.Wait(); err != nil {
-		err = errors.Wrap(err, "mtx command")
+		err = errors.Wrap(err, "mtx wait command")
 		err = errors.Wrap(err, strings.TrimSuffix(string(cmderr), "\n"))
 		return []byte{}, err
 	}
