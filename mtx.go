@@ -295,6 +295,7 @@ func (l *Library) Load(vol *Volume, drive Slot) error {
 			Type: s.Type,
 			ID:   s.ID,
 		}
+		vol.Drive = drive.ID
 	}
 	return errors.Wrap(err, "load")
 }
@@ -315,6 +316,7 @@ func (l *Library) LoadCln(d Slot) error {
 	_, err := mtxCmd(l.Command, l.Device, "load", v.Home, d.ID)
 	if err == nil && l.initialized {
 		d := l.mi.Drives[d.ID]
+		l.mi.Slots[v.Home].Vol.Drive = d.ID
 		l.mi.Drives[d.ID] = Slot{
 			Type: d.Type,
 			ID:   d.ID,
@@ -354,6 +356,7 @@ func (l *Library) Unload(vol *Volume) error {
 			Type: d.Type,
 			ID:   d.ID,
 		}
+		vol.Drive = ""
 	}
 	return errors.Wrap(err, "unloadvol")
 }

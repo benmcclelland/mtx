@@ -195,29 +195,35 @@ func TestLoad(t *testing.T) {
 		t.Errorf("Load: expected Vol ID in drive expected M00003L6, got %v",
 			m.Drives["1"].Vol.ID)
 	}
+	if m.Drives["1"].Vol.Drive != "1" {
+		t.Errorf("Load: expected Drive ID 1 for Vol M00003L6, got %v", m.Drives["1"].Vol.Drive)
+	}
 }
 
 func TestLoadCln(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
 	err := lib.Status()
 	if err != nil {
-		t.Errorf("LoadVolCln: Status(): %v", err)
+		t.Errorf("LoadCln: Status(): %v", err)
 	}
 	m := lib.Info()
 	err = lib.LoadCln(m.Drives["1"])
 	if err != nil {
-		t.Errorf("LoadVolCln: LoadCln(): %v", err)
+		t.Errorf("LoadCln: LoadCln(): %v", err)
 	}
 	if m.Slots["4"].Vol != nil {
-		t.Errorf("LoadVol: expected to empty slot 4 (nil Vol), got %v",
+		t.Errorf("LoadCln: expected to empty slot 4 (nil Vol), got %v",
 			m.Slots["4"].Vol.ID)
 	}
 	if m.Drives["1"].Vol == nil {
-		t.Error("LoadVol: expected non-empty Drive, got nil Vol")
+		t.Error("LoadCln: expected non-empty Drive, got nil Vol")
 	}
 	if m.Drives["1"].Vol.ID != "CLN004L6" {
-		t.Errorf("LoadVol: expected Vol ID in drive expected CLN004L6, got %v",
+		t.Errorf("LoadCln: expected Vol ID in drive expected CLN004L6, got %v",
 			m.Drives["1"].Vol.ID)
+	}
+	if m.Drives["1"].Vol.Drive != "1" {
+		t.Errorf("LoadCln: expected Drive ID 1 for Vol M00003L6, got %v", m.Drives["1"].Vol.Drive)
 	}
 }
 
@@ -239,6 +245,10 @@ func TestUnLoad(t *testing.T) {
 	if m.Slots["1"].Vol.ID != "M00001L6" {
 		t.Errorf("Unload: Vol ID in slot expected M00001L6, got %v",
 			m.Slots["1"].Vol.ID)
+	}
+	if m.Slots["1"].Vol.Drive != "" {
+		t.Errorf("Unload: Vol Drive in slot expected empty string, got %v",
+			m.Slots["1"].Vol.Drive)
 	}
 	if m.Drives["0"].Vol != nil {
 		t.Errorf("Unload: expected empty Drive, got Vol %v", m.Drives["0"].Vol.ID)
@@ -262,6 +272,9 @@ func TestTransfer(t *testing.T) {
 	}
 	if m.Slots["2"].Vol.ID != "M00003L6" {
 		t.Errorf("Transfer: Vol ID in slot expected M00003L6, got %v", m.Slots["2"].Vol.ID)
+	}
+	if m.Slots["2"].Vol.Drive != "" {
+		t.Errorf("Transfer: Vol Drive in slot expected empty string, got %v", m.Slots["2"].Vol.Drive)
 	}
 	if m.Slots["3"].Vol != nil {
 		t.Errorf("Unload: expected empty Slot, got Vol %v\n%+v",
