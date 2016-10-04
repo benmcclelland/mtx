@@ -116,19 +116,19 @@ func NewLibraryCmd(device, cmd string) *Library {
 
 // Status returns a structured representation of the drives, slots,
 // import/export, and media locations
-func (l *Library) Status() error {
+func (l *Library) Status() (*MediaInfo, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	result, err := mtxCmd(l.Command, l.Device, "status")
 	if err != nil {
-		return errors.Wrap(err, "status")
+		return nil, errors.Wrap(err, "status")
 	}
 
 	l.mi, err = parseStatus(bytes.NewReader(result))
 	if err == nil {
 		l.initialized = true
 	}
-	return errors.Wrap(err, "status")
+	return &l.mi, errors.Wrap(err, "status")
 }
 
 func parseStatus(r io.Reader) (MediaInfo, error) {
@@ -382,12 +382,6 @@ func (l *Library) Transfer(vol *Volume, slot Slot) error {
 		vol.Home = slot.ID
 	}
 	return errors.Wrap(err, "transfer")
-}
-
-// Info returns a copy of the MediaInfo for the library
-// Will be an empty struct if Status() hasn't been called yet
-func (l *Library) Info() MediaInfo {
-	return l.mi
 }
 
 // String representation for a Library is the device path

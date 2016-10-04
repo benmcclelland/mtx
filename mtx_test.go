@@ -4,11 +4,10 @@ import "testing"
 
 func TestStatus(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
-	err := lib.Status()
+	m, err := lib.Status()
 	if err != nil {
 		t.Errorf("Status(): %v", err)
 	}
-	m := lib.Info()
 	if m.NumDrives != int(2) {
 		t.Errorf("Status(): NumDrives expected 2, got %v", m.NumDrives)
 	}
@@ -174,7 +173,7 @@ func TestInventory(t *testing.T) {
 
 func TestLoad(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
-	err := lib.Status()
+	m, err := lib.Status()
 	if err != nil {
 		t.Errorf("Load: Status(): %v", err)
 	}
@@ -182,7 +181,6 @@ func TestLoad(t *testing.T) {
 	if err != nil {
 		t.Errorf("Load: %v", err)
 	}
-	m := lib.Info()
 	// check changes to m
 	if m.Slots["3"].Vol != nil {
 		t.Errorf("Load: expected to empty slot 3 (nil Vol), got %v",
@@ -202,11 +200,10 @@ func TestLoad(t *testing.T) {
 
 func TestLoadCln(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
-	err := lib.Status()
+	m, err := lib.Status()
 	if err != nil {
 		t.Errorf("LoadCln: Status(): %v", err)
 	}
-	m := lib.Info()
 	err = lib.LoadCln(m.Drives["1"])
 	if err != nil {
 		t.Errorf("LoadCln: LoadCln(): %v", err)
@@ -229,7 +226,7 @@ func TestLoadCln(t *testing.T) {
 
 func TestUnLoad(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
-	err := lib.Status()
+	m, err := lib.Status()
 	if err != nil {
 		t.Errorf("Unload: Status(): %v", err)
 	}
@@ -237,7 +234,6 @@ func TestUnLoad(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unload: %v", err)
 	}
-	m := lib.Info()
 	// check changes to m
 	if m.Slots["1"].Vol == nil {
 		t.Errorf("Unload: expected non-empty slot 1")
@@ -257,7 +253,7 @@ func TestUnLoad(t *testing.T) {
 
 func TestTransfer(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
-	err := lib.Status()
+	m, err := lib.Status()
 	if err != nil {
 		t.Errorf("Unload: Status(): %v", err)
 	}
@@ -265,7 +261,6 @@ func TestTransfer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unload: %v", err)
 	}
-	m := lib.Info()
 	// check changes to m
 	if m.Slots["2"].Vol == nil {
 		t.Errorf("Transfer: expected non-empty slot 1")
@@ -284,7 +279,7 @@ func TestTransfer(t *testing.T) {
 
 func TestStatusFail(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmockerr")
-	err := lib.Status()
+	_, err := lib.Status()
 	if err == nil {
 		t.Errorf("Status(): expected error, got success")
 	}
@@ -334,12 +329,11 @@ func TestTransferFail(t *testing.T) {
 
 func TestGetDriveByID(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
-	err := lib.Status()
+	m, err := lib.Status()
 	if err != nil {
 		t.Errorf("GetDriveByID: Status(): %v", err)
 	}
-	m := lib.Info()
-	d, err := GetDriveByID("1", m)
+	d, err := GetDriveByID("1", *m)
 	if err != nil {
 		t.Errorf("GetDriveByID(): %v", err)
 	}
@@ -350,12 +344,11 @@ func TestGetDriveByID(t *testing.T) {
 
 func TestGetDriveByIDFail(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
-	err := lib.Status()
+	m, err := lib.Status()
 	if err != nil {
 		t.Errorf("GetDriveByID: Status(): %v", err)
 	}
-	m := lib.Info()
-	_, err = GetDriveByID("2", m)
+	_, err = GetDriveByID("2", *m)
 	if err == nil {
 		t.Errorf("GetDriveByID(): expected error, got nil")
 	}
@@ -363,12 +356,11 @@ func TestGetDriveByIDFail(t *testing.T) {
 
 func TestGetSlotByID(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
-	err := lib.Status()
+	m, err := lib.Status()
 	if err != nil {
 		t.Errorf("GetSlotByID: Status(): %v", err)
 	}
-	m := lib.Info()
-	s, err := GetSlotByID("1", m)
+	s, err := GetSlotByID("1", *m)
 	if err != nil {
 		t.Errorf("GetSlotByID(): %v", err)
 	}
@@ -379,12 +371,11 @@ func TestGetSlotByID(t *testing.T) {
 
 func TestGetSlotByIDFail(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
-	err := lib.Status()
+	m, err := lib.Status()
 	if err != nil {
 		t.Errorf("GetSlotByID: Status(): %v", err)
 	}
-	m := lib.Info()
-	_, err = GetSlotByID("10", m)
+	_, err = GetSlotByID("10", *m)
 	if err == nil {
 		t.Errorf("GetSlotByID(): expected error, got nil")
 	}
@@ -392,12 +383,11 @@ func TestGetSlotByIDFail(t *testing.T) {
 
 func TestGetMboxByID(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
-	err := lib.Status()
+	m, err := lib.Status()
 	if err != nil {
 		t.Errorf("GetMboxByID: Status(): %v", err)
 	}
-	m := lib.Info()
-	s, err := GetMboxByID("5", m)
+	s, err := GetMboxByID("5", *m)
 	if err != nil {
 		t.Errorf("GetMboxByID(): %v", err)
 	}
@@ -408,12 +398,11 @@ func TestGetMboxByID(t *testing.T) {
 
 func TestGetMboxByIDFail(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
-	err := lib.Status()
+	m, err := lib.Status()
 	if err != nil {
 		t.Errorf("GetMboxByID: Status(): %v", err)
 	}
-	m := lib.Info()
-	_, err = GetMboxByID("10", m)
+	_, err = GetMboxByID("10", *m)
 	if err == nil {
 		t.Errorf("GetMboxByID(): expected error, got nil")
 	}
@@ -421,12 +410,11 @@ func TestGetMboxByIDFail(t *testing.T) {
 
 func TestFindHomeSlot(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
-	err := lib.Status()
+	m, err := lib.Status()
 	if err != nil {
 		t.Errorf("FindHomeSlot: Status(): %v", err)
 	}
-	m := lib.Info()
-	s, err := FindHomeSlot(*m.Slots["3"].Vol, m)
+	s, err := FindHomeSlot(*m.Slots["3"].Vol, *m)
 	if err != nil {
 		t.Errorf("FindHomeSlot(): %v", err)
 	}
@@ -437,12 +425,11 @@ func TestFindHomeSlot(t *testing.T) {
 
 func TestFindHomeSlotFail(t *testing.T) {
 	lib := NewLibraryCmd("/dev/sga", "./mtxmock")
-	err := lib.Status()
+	m, err := lib.Status()
 	if err != nil {
 		t.Errorf("FindHomeSlot: Status(): %v", err)
 	}
-	m := lib.Info()
-	_, err = FindHomeSlot(Volume{ID: "abc", Home: "100", Drive: ""}, m)
+	_, err = FindHomeSlot(Volume{ID: "abc", Home: "100", Drive: ""}, *m)
 	if err == nil {
 		t.Errorf("FindHomeSlot(): expected error, but got nil")
 	}
