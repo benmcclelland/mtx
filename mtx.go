@@ -483,6 +483,96 @@ func FindStorageVolumePattern(pattern string, mi *MediaInfo) ([]*Volume, error) 
 	return result, nil
 }
 
+// FindDriveVolume returns a *Volume for the first matching
+// volume id in a drive slot
+func FindDriveVolume(barcode string, mi *MediaInfo) (*Volume, error) {
+	for _, slot := range mi.Drives {
+		if slot.Vol != nil && slot.Vol.ID == barcode {
+			return slot.Vol, nil
+		}
+	}
+	return nil, errors.Errorf("volume %s not found in any drive element slots", barcode)
+}
+
+// FindDriveVolumes returns a slice of *Volume for the matching
+// volume(s) with a given prefix id in a storage slot
+func FindDriveVolumes(prefix string, mi *MediaInfo) ([]*Volume, error) {
+	var result []*Volume
+	for _, slot := range mi.Drives {
+		if slot.Vol != nil && strings.HasPrefix(slot.Vol.ID, prefix) {
+			result = append(result, slot.Vol)
+		}
+	}
+	if len(result) == 0 {
+		return nil, errors.Errorf("no volumes with prefix %s found in any drive element slots", prefix)
+	}
+	return result, nil
+}
+
+// FindDriveVolumePattern returns a slice of *Volume for the matching
+// volume(s) with a given regex in a storage slot
+func FindDriveVolumePattern(pattern string, mi *MediaInfo) ([]*Volume, error) {
+	var result []*Volume
+	volregex, err := regexp.Compile(pattern)
+	if err != nil {
+		return result, errors.Wrap(err, "could not compile volume expression")
+	}
+	for _, slot := range mi.Drives {
+		if slot.Vol != nil && volregex.Match([]byte(slot.Vol.ID)) {
+			result = append(result, slot.Vol)
+		}
+	}
+	if len(result) == 0 {
+		return nil, errors.Errorf("no volumes with pattern %s found in any drive element slots", pattern)
+	}
+	return result, nil
+}
+
+// FindMboxVolume returns a *Volume for the first matching
+// volume id in a mailbox slot
+func FindMboxVolume(barcode string, mi *MediaInfo) (*Volume, error) {
+	for _, slot := range mi.Mboxes {
+		if slot.Vol != nil && slot.Vol.ID == barcode {
+			return slot.Vol, nil
+		}
+	}
+	return nil, errors.Errorf("volume %s not found in any mailbox element slots", barcode)
+}
+
+// FindMboxVolumes returns a slice of *Volume for the matching
+// volume(s) with a given prefix id in a storage slot
+func FindMboxVolumes(prefix string, mi *MediaInfo) ([]*Volume, error) {
+	var result []*Volume
+	for _, slot := range mi.Mboxes {
+		if slot.Vol != nil && strings.HasPrefix(slot.Vol.ID, prefix) {
+			result = append(result, slot.Vol)
+		}
+	}
+	if len(result) == 0 {
+		return nil, errors.Errorf("no volumes with prefix %s found in any mailbox element slots", prefix)
+	}
+	return result, nil
+}
+
+// FindMboxVolumePattern returns a slice of *Volume for the matching
+// volume(s) with a given regex in a storage slot
+func FindMboxVolumePattern(pattern string, mi *MediaInfo) ([]*Volume, error) {
+	var result []*Volume
+	volregex, err := regexp.Compile(pattern)
+	if err != nil {
+		return result, errors.Wrap(err, "could not compile volume expression")
+	}
+	for _, slot := range mi.Mboxes {
+		if slot.Vol != nil && volregex.Match([]byte(slot.Vol.ID)) {
+			result = append(result, slot.Vol)
+		}
+	}
+	if len(result) == 0 {
+		return nil, errors.Errorf("no volumes with pattern %s found in any mailbox element slots", pattern)
+	}
+	return result, nil
+}
+
 // FindHomeSlot returns the home slot for the volume
 func FindHomeSlot(vol Volume, mi MediaInfo) (Slot, error) {
 	if s, ok := mi.Slots[vol.Home]; ok {
