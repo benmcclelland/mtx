@@ -438,6 +438,51 @@ func FindCleaningMedia(m MediaInfo) []Volume {
 	return result
 }
 
+// FindStorageVolume returns a *Volume for the first matching
+// volume id in a storage slot
+func FindStorageVolume(barcode string, mi *MediaInfo) (*Volume, error) {
+	for _, slot := range mi.Slots {
+		if slot.Vol != nil && slot.Vol.ID == barcode {
+			return slot.Vol, nil
+		}
+	}
+	return nil, errors.Errorf("volume %s not found in any storage element slots", barcode)
+}
+
+// FindStorageVolumes returns a slice of *Volume for the matching
+// volume(s) with a given prefix id in a storage slot
+func FindStorageVolumes(prefix string, mi *MediaInfo) ([]*Volume, error) {
+	var result []*Volume
+	for _, slot := range mi.Slots {
+		if slot.Vol != nil && strings.HasPrefix(slot.Vol.ID, prefix) {
+			result = append(result, slot.Vol)
+		}
+	}
+	if len(result) == 0 {
+		return nil, errors.Errorf("no volumes with prefix %s found in any storage element slots", prefix)
+	}
+	return result, nil
+}
+
+// FindStorageVolumePattern returns a slice of *Volume for the matching
+// volume(s) with a given regex in a storage slot
+func FindStorageVolumePattern(pattern string, mi *MediaInfo) ([]*Volume, error) {
+	var result []*Volume
+	volregex, err := regexp.Compile(pattern)
+	if err != nil {
+		return result, errors.Wrap(err, "could not compile volume expression")
+	}
+	for _, slot := range mi.Slots {
+		if slot.Vol != nil && volregex.Match([]byte(slot.Vol.ID)) {
+			result = append(result, slot.Vol)
+		}
+	}
+	if len(result) == 0 {
+		return nil, errors.Errorf("no volumes with pattern %s found in any storage element slots", pattern)
+	}
+	return result, nil
+}
+
 // FindHomeSlot returns the home slot for the volume
 func FindHomeSlot(vol Volume, mi MediaInfo) (Slot, error) {
 	if s, ok := mi.Slots[vol.Home]; ok {
