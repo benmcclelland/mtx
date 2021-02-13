@@ -37,11 +37,11 @@ const (
 var (
 	summaryRxp  = regexp.MustCompile(`\s*Storage Changer .*:(\d*) Drives, (\d*) Slots \( (\d*) Import/Export \)`)
 	dteEmptyRxp = regexp.MustCompile(`Data Transfer Element (\d*):Empty`)
-	dteFullRxp  = regexp.MustCompile(`Data Transfer Element (\d*):Full \(Storage Element (\d*) Loaded\):VolumeTag = (.*)`)
+	dteFullRxp  = regexp.MustCompile(`Data Transfer Element (\d*):Full \(Storage Element (\d*) Loaded\):VolumeTag = (\S*)`)
 	seEmptyRxp  = regexp.MustCompile(`\s*Storage Element (\d*):Empty`)
-	seFullRxp   = regexp.MustCompile(`\s*Storage Element (\d*):Full :VolumeTag=(.*)`)
+	seFullRxp   = regexp.MustCompile(`\s*Storage Element (\d*):Full :VolumeTag=(\S*)`)
 	ieEmptyRxp  = regexp.MustCompile(`\s*Storage Element (\d*) IMPORT/EXPORT:Empty`)
-	ieFullRxp   = regexp.MustCompile(`\s*Storage Element (\d*) IMPORT/EXPORT:Full :VolumeTag=(.*)`)
+	ieFullRxp   = regexp.MustCompile(`\s*Storage Element (\d*) IMPORT/EXPORT:Full :VolumeTag=(\S*)`)
 	clnRxp      = regexp.MustCompile(`(CLN.*)`)
 )
 
